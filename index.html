@@ -518,8 +518,7 @@ async function generate(userText, attachments) {
     add_generation_prompt: true,
   });
 
-  // Build processor call: processor(prompt, images?, audio?, options?)
-  // Images: pass single RawImage or null. Audio: pass single Float32Array or null.
+  // Build processor call: processor(prompt, image?, audio?, options?)
   let inputs;
   const image = images.length > 0 ? images[0] : null;
   const audio = audios.length > 0 ? audios[0] : null;
@@ -528,7 +527,15 @@ async function generate(userText, attachments) {
   } else if (image && !audio) {
     inputs = await processor(prompt, image, { add_special_tokens: false });
   } else if (!image && audio) {
-    inputs = await processor(prompt, null, audio, { add_special_tokens: false });
+    // Audio-only: processor needs image in 2nd position, pass audio directly
+    // Some processor versions choke on null image, so pass audio as 2nd arg
+    // and let the processor detect the type
+    try {
+      inputs = await processor(prompt, null, audio, { add_special_tokens: false });
+    } catch {
+      // Fallback: try passing audio as 2nd arg (some versions accept this)
+      inputs = await processor(prompt, audio, { add_special_tokens: false });
+    }
   } else {
     inputs = await processor(prompt, image, audio, { add_special_tokens: false });
   }
