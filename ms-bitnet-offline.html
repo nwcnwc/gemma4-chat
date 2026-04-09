@@ -110,6 +110,15 @@ window.Worker = function(url, opts) {
   return new _OrigWorker(url, opts);
 };
 
+// Stub out storage APIs that fail from file:// origins
+// wllama checks these during init even with useCache:false
+if (!navigator.storage || !navigator.storage.getDirectory) {
+  navigator.storage = navigator.storage || {};
+  navigator.storage.getDirectory = () => Promise.reject(new Error("OPFS not available"));
+  navigator.storage.estimate = () => Promise.resolve({ quota: 0, usage: 0 });
+}
+try { indexedDB; } catch { window.indexedDB = null; }
+
 // Custom wllama build with BitNet i2_s support, hosted from this repo
 // jsdelivr serves GitHub files with correct MIME types (raw.githubusercontent does not)
 const REPO_BASE = "https://cdn.jsdelivr.net/gh/nwcnwc/offline-llms@main/wllama-bitnet";
