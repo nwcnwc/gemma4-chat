@@ -368,11 +368,9 @@ function addMessage(role, text, mediaElements) {
   if (mediaElements) {
     for (const el of mediaElements) div.appendChild(el);
   }
-  if (text) {
-    const span = document.createElement("span");
-    span.textContent = text;
-    div.appendChild(span);
-  }
+  const span = document.createElement("span");
+  if (text) span.textContent = text;
+  div.appendChild(span);
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
   return div;
