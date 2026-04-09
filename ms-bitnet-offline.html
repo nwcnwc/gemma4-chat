@@ -179,6 +179,7 @@ async function loadModel() {
     const response = await fetch(MODEL_URL);
     if (!response.ok) throw new Error(`Download failed: ${response.status} ${response.statusText}`);
     const contentLength = +response.headers.get("content-length") || 0;
+    console.log("Model fetch status:", response.status, "type:", response.headers.get("content-type"), "length:", contentLength, "url:", response.url);
     const reader = response.body.getReader();
     const chunks = [];
     let loaded = 0;
@@ -196,6 +197,16 @@ async function loadModel() {
       }
     }
     const modelBlob = new Blob(chunks);
+    // Verify we got GGUF binary (magic: 0x47475546 = "GGUF")
+    const header = new Uint8Array(await modelBlob.slice(0, 4).arrayBuffer());
+    const magic = String.fromCharCode(...header);
+    console.log("Downloaded blob size:", modelBlob.size, "magic:", magic, "bytes:", header);
+    if (magic !== "GGUF") {
+      // Log first 200 chars to see what we actually got
+      const text = await modelBlob.slice(0, 200).text();
+      console.error("Not a GGUF file! First 200 chars:", text);
+      throw new Error("Downloaded file is not a valid GGUF model (got " + magic + "). HuggingFace may have returned an error page.");
+    }
 
     setStatus("Loading model into WASM...", "loading");
     await wllama.loadModel([modelBlob], { n_ctx: 4096 });
