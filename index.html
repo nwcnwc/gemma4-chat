@@ -518,26 +518,16 @@ async function generate(userText, attachments) {
     add_generation_prompt: true,
   });
 
-  // Build processor call: processor(prompt, image?, audio?, options?)
+  // Build processor call: processor(text, images, audios)
+  // All three positional args must be present to avoid misinterpretation.
+  // Pass null explicitly for unused modalities.
   let inputs;
   const image = images.length > 0 ? images[0] : null;
   const audio = audios.length > 0 ? audios[0] : null;
   if (!image && !audio) {
     inputs = await processor(prompt);
-  } else if (image && !audio) {
-    inputs = await processor(prompt, image, { add_special_tokens: false });
-  } else if (!image && audio) {
-    // Audio-only: processor needs image in 2nd position, pass audio directly
-    // Some processor versions choke on null image, so pass audio as 2nd arg
-    // and let the processor detect the type
-    try {
-      inputs = await processor(prompt, null, audio, { add_special_tokens: false });
-    } catch {
-      // Fallback: try passing audio as 2nd arg (some versions accept this)
-      inputs = await processor(prompt, audio, { add_special_tokens: false });
-    }
   } else {
-    inputs = await processor(prompt, image, audio, { add_special_tokens: false });
+    inputs = await processor(prompt, image, audio);
   }
   const assistantDiv = addMessage("assistant", "");
   const textNode = assistantDiv.querySelector("span");
