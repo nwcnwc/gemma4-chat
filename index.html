@@ -517,15 +517,14 @@ async function generate(userText, attachments) {
     add_generation_prompt: true,
   });
 
-  // Build processor args: (prompt, ...images, ...audios) or just (prompt)
-  const processorArgs = [prompt];
-  for (const img of images) processorArgs.push(img);
-  for (const aud of audios) processorArgs.push(aud);
+  // Build processor call based on what media is attached
+  let inputs;
   if (images.length === 0 && audios.length === 0) {
-    processorArgs.push(null); // no media
+    inputs = await processor(prompt);
+  } else {
+    const mediaArgs = [...images, ...audios];
+    inputs = await processor(prompt, ...mediaArgs, { add_special_tokens: false });
   }
-
-  const inputs = await processor(...processorArgs, { add_special_tokens: false });
   const assistantDiv = addMessage("assistant", "");
   let fullText = "";
   const startTime = performance.now();
