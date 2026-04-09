@@ -100,12 +100,21 @@
 </div>
 
 <script type="module">
-// Patch Worker to use classic (non-module) workers.
-// The embedded worker code has zero ES module imports, so type:"module" is unnecessary.
-// Classic workers avoid the cross-origin redirect error on file:// origins.
+// Patch Worker: fetch the blob content, re-create as same-origin blob without module type issues
 const _OrigWorker = Worker;
-window.Worker = function(url, opts) {
-  return new _OrigWorker(url, opts ? { ...opts, type: undefined } : opts);
+window.Worker = function(blobUrl, opts) {
+  // The worker code is a blob URL. Fetch its content and re-create
+  // as a classic worker to avoid file:// cross-origin module restrictions.
+  if (typeof blobUrl === 'string' && blobUrl.startsWith('blob:')) {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', blobUrl, false); // synchronous
+    xhr.send();
+    const code = xhr.responseText;
+    const newBlob = new Blob([code], { type: 'application/javascript' });
+    const newUrl = URL.createObjectURL(newBlob);
+    return new _OrigWorker(newUrl);
+  }
+  return new _OrigWorker(blobUrl, opts);
 };
 
 // Stub out storage APIs that fail from file:// and blob: origins
