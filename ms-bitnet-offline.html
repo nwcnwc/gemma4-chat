@@ -99,8 +99,18 @@
   <button id="send-btn" onclick="send()" disabled>Send</button>
 </div>
 
+<script>
+// file:// origins can't use module workers or OPFS. Redirect to a blob: URL
+// which gets an opaque origin that supports these features.
+// The blob URL contains the same HTML, so the app runs identically.
+if (location.protocol === "file:") {
+  const html = "<!DOCTYPE html>" + document.documentElement.outerHTML;
+  const blob = new Blob([html], { type: "text/html" });
+  location.href = URL.createObjectURL(blob);
+}
+</script>
 <script type="module">
-// Stub out storage APIs that fail from file:// origins
+// Stub out storage APIs that fail from file:// and blob: origins
 if (!navigator.storage || !navigator.storage.getDirectory) {
   navigator.storage = navigator.storage || {};
   navigator.storage.getDirectory = () => Promise.reject(new Error("OPFS not available"));
