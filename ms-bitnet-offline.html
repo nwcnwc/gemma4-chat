@@ -3459,9 +3459,8 @@ const { Wllama } = await import(jsUrl);
 
 // Decode inline WASM to blob URL
 const wasmB64 = document.getElementById('wllama-wasm').textContent.trim();
-const wasmBytes = Uint8Array.from(atob(wasmB64), c => c.charCodeAt(0));
-const wasmBlob = new Blob([wasmBytes], { type: 'application/wasm' });
-const wasmUrl = URL.createObjectURL(wasmBlob);
+// Use data: URL — workers can fetch data: URLs from any origin (unlike blob: URLs)
+const wasmUrl = 'data:application/wasm;base64,' + wasmB64;
 
 // DEBUG: local model URL for fast iteration
 const MODEL_URL = 'http://localhost:8765/ggml-model-i2_s.gguf';
