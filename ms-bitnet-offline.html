@@ -1598,27 +1598,14 @@ var ProxyToWorker = class {
       }
       let moduleCode = this.multiThread ? WLLAMA_MULTI_THREAD_CODE : WLLAMA_SINGLE_THREAD_CODE;
       let mainModuleCode = moduleCode.replace("var Module", "var ___Module");
-      // Exclude _wasmB64 from RUN_OPTIONS (it's injected separately to avoid double-serialization)
-      const cleanPathConfig = Object.fromEntries(Object.entries(this.pathConfig).filter(([k]) => !k.startsWith('_')));
       const runOptions = {
-        pathConfig: cleanPathConfig,
+        pathConfig: this.pathConfig,
         nbThread: this.nbThread
       };
-      // Patch worker code to inject wasmBinary if available in RUN_OPTIONS
-      let workerCode = LLAMA_CPP_WORKER_CODE;
-      if (this.pathConfig._wasmB64) {
-        // Inject wasmBinary into the Emscripten Module config
-        // Must be set before wModuleInit evaluates the glue code
-        workerCode = workerCode.replace(
-          "wModuleInit();",
-          "{ const b = atob(_WASM_B64); const a = new Uint8Array(b.length); for(let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); Module.wasmBinary = a.buffer; } wModuleInit();"
-        );
-      }
       const completeCode = [
-        this.pathConfig._wasmB64 ? `const _WASM_B64 = ${JSON.stringify(this.pathConfig._wasmB64)};` : '',
         `const RUN_OPTIONS = ${JSON.stringify(runOptions)};`,
         `function wModuleInit() { ${mainModuleCode}; return Module; }`,
-        workerCode
+        LLAMA_CPP_WORKER_CODE
       ].join(";\n\n");
       this.worker = createWorker(completeCode);
       this.worker.onmessage = this.onRecvMsg.bind(this);
@@ -2715,8 +2702,6 @@ var Wllama = class {
           this.pathConfig["single-thread/wllama.wasm"]
         )
       };
-      // Pass through _wasmB64 for inline WASM injection
-      if (this.pathConfig._wasmB64) mPathConfig._wasmB64 = this.pathConfig._wasmB64;
       this.proxy = new ProxyToWorker(
         mPathConfig,
         this.useMultiThread ? nbThreads : 1,
