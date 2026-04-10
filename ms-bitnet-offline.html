@@ -1598,14 +1598,25 @@ var ProxyToWorker = class {
       }
       let moduleCode = this.multiThread ? WLLAMA_MULTI_THREAD_CODE : WLLAMA_SINGLE_THREAD_CODE;
       let mainModuleCode = moduleCode.replace("var Module", "var ___Module");
+      // Exclude _wasmB64 from RUN_OPTIONS (it's injected separately to avoid double-serialization)
+      const cleanPathConfig = Object.fromEntries(Object.entries(this.pathConfig).filter(([k]) => !k.startsWith('_')));
       const runOptions = {
-        pathConfig: this.pathConfig,
+        pathConfig: cleanPathConfig,
         nbThread: this.nbThread
       };
+      // Patch worker code to inject wasmBinary if available in RUN_OPTIONS
+      let workerCode = LLAMA_CPP_WORKER_CODE;
+      if (this.pathConfig._wasmB64) {
+        workerCode = workerCode.replace(
+          "Module = getWModuleConfig(argMainScriptBlob);",
+          "Module = getWModuleConfig(argMainScriptBlob); { const b = atob(_WASM_B64); const a = new Uint8Array(b.length); for(let i=0;i<b.length;i++) a[i]=b.charCodeAt(i); Module.wasmBinary = a.buffer; }"
+        );
+      }
       const completeCode = [
+        this.pathConfig._wasmB64 ? `const _WASM_B64 = ${JSON.stringify(this.pathConfig._wasmB64)};` : '',
         `const RUN_OPTIONS = ${JSON.stringify(runOptions)};`,
         `function wModuleInit() { ${mainModuleCode}; return Module; }`,
-        LLAMA_CPP_WORKER_CODE
+        workerCode
       ].join(";\n\n");
       this.worker = createWorker(completeCode);
       this.worker.onmessage = this.onRecvMsg.bind(this);
@@ -3459,8 +3470,6 @@ const { Wllama } = await import(jsUrl);
 
 // Decode inline WASM to blob URL
 const wasmB64 = document.getElementById('wllama-wasm').textContent.trim();
-// Use data: URL — workers can fetch data: URLs from any origin (unlike blob: URLs)
-const wasmUrl = 'data:application/wasm;base64,' + wasmB64;
 
 // DEBUG: local model URL for fast iteration
 const MODEL_URL = 'http://localhost:8765/ggml-model-i2_s.gguf';
@@ -3495,7 +3504,7 @@ function buildPrompt() {
 async function init() {
   try {
     setSt('Creating WASM runtime...', 'loading');
-    wllama = new Wllama({ 'single-thread/wllama.wasm': wasmUrl });
+    wllama = new Wllama({ 'single-thread/wllama.wasm': 'inline', 'wllama.wasm': 'inline', _wasmB64: wasmB64 });
 
     setSt('Downloading model...', 'loading');
     const resp = await fetch(MODEL_URL);
