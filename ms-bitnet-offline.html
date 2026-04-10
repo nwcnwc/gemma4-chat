@@ -1599,12 +1599,12 @@ var ProxyToWorker = class {
       let moduleCode = this.multiThread ? WLLAMA_MULTI_THREAD_CODE : WLLAMA_SINGLE_THREAD_CODE;
       let mainModuleCode = moduleCode.replace("var Module", "var ___Module");
       const runOptions = {
-        pathConfig: this.pathConfig,
+        pathConfig: Object.fromEntries(Object.entries(this.pathConfig).filter(function(e){return !e[0].startsWith("_")})),
         nbThread: this.nbThread
       };
-      const completeCode = [
+      const _wb64=this.pathConfig._wasmB64||"";const completeCode = [_wb64?("var _WASM_BIN=(function(){var b=atob("+JSON.stringify(_wb64)+");var a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a.buffer})();"):"",
         `const RUN_OPTIONS = ${JSON.stringify(runOptions)};`,
-        `function wModuleInit() { ${mainModuleCode}; return Module; }`,
+        `function wModuleInit() { if(typeof _WASM_BIN!=="undefined"){Module.wasmBinary=_WASM_BIN;} ${mainModuleCode}; return Module; }`,
         LLAMA_CPP_WORKER_CODE
       ].join(";\n\n");
       this.worker = createWorker(completeCode);
@@ -2702,6 +2702,7 @@ var Wllama = class {
           this.pathConfig["single-thread/wllama.wasm"]
         )
       };
+      if (this.pathConfig._wasmB64) mPathConfig._wasmB64 = this.pathConfig._wasmB64;
       this.proxy = new ProxyToWorker(
         mPathConfig,
         this.useMultiThread ? nbThreads : 1,
